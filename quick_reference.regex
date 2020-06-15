@@ -1,0 +1,2 @@
+# Capture a match - if replacing, removes all other lines
+.*(match_this)*.*\n*

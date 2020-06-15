@@ -1,0 +1,44 @@
+// The _IsBillable property specifies whether ingested data is billable.
+union *
+| where _IsBillable = true
+
+// The _BilledSize property specifies the size in bytes of data that will be billed to your Azure account if _IsBillable is true.
+union *
+| where _IsBillable = true
+| summarize bytes=sum(_BilledSize) by Computer
+
+// The TimeGenerated (Log Analytics workspace) and timestamp (Application Insights application) properties contain the date and time that the record was created by the data source. See Log data ingestion time in Azure Monitor for more details.
+Event
+| where TimeGenerated >= ago(10d)
+
+exceptions
+| where timestamp >= ago(10d)
+
+// The _TimeReceived property contains the date and time that the record was received by the Azure Monitor ingestion point in the Azure cloud.
+Event
+| where _TimeReceived >= ago(10d)
+
+// The Type (Log Analytics workspace) and itemType (Application Insights application) properties hold the name of the table that the record was retrieved from which can also be thought of as the record type.
+search * 
+| where TimeGenerated > ago(1h)
+| summarize count() by Type
+
+let IgnoreAlerts = dynamic(
+["More Than 2 Unique Alerts On Same Machine Over Last 30 Days", 
+"Same Event Detected on Same Machine Over Time", 
+"Automated investigation started manually"]
+);
+DeviceAlertEvents
+| where Title !in (IgnoreAlerts)
+| summarize (Timestamp, ReportId)=arg_max(Timestamp, ReportId), Apart=datetime_diff('day', max(Timestamp), min(Timestamp)), UniqueAlerts=dcount(Title), Total=count() by DeviceName, DeviceId
+| where Timestamp >= ago(2d) and UniqueAlerts >= 2 and Apart >= 2 and Total >= 2
+
+let IgnoreAlerts = dynamic(
+    ["More Than 2 Unique Alerts On Same Machine Over Last 30 Days", 
+    "Same Event Detected on Same Machine Over Time", 
+    "Automated investigation started manually"]
+);
+DeviceAlertEvents
+| summarize (Timestamp, ReportId)=arg_max(Timestamp, ReportId),  Apart=datetime_diff('day', max(Timestamp), min(Timestamp)), Total=count() by DeviceName, Title, DeviceId
+| where Title !in (IgnoreAlerts)
+| where Timestamp >= ago(2d) and Total >= 2 and Apart >= 2
